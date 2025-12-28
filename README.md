@@ -1,216 +1,171 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Wincorder.tgr</title>
+<title>WinCorder TGR</title>
 <style>
-    body {
-        margin: 0;
-        font-family: Arial, sans-serif;
-        background: #111;
-        color: white;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-    }
-
-    .container {
-        position: relative;
-        width: 80%;
-        max-width: 800px;
-        margin-top: 20px;
-    }
-
-    video {
-        width: 100%;
-        border-radius: 8px;
-        background: black;
-    }
-
-    /* Watermark */
-    .watermark {
-        position: absolute;
-        top: 10px;
-        left: 50%;
-        transform: translateX(-50%);
-        font-size: 32px;
-        font-weight: bold;
-        opacity: 0.5; /* 50% transparent */
-        pointer-events: none;
-        user-select: none;
-    }
-
-    .controls {
-        margin-top: 15px;
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-        justify-content: center;
-    }
-
-    button, label {
-        background: #222;
-        color: white;
-        border: 1px solid #444;
-        padding: 8px 12px;
-        border-radius: 5px;
-        cursor: pointer;
-    }
-
-    button:hover, label:hover {
-        background: #333;
-    }
-
-    input[type="checkbox"] {
-        margin-right: 6px;
-    }
+  body { font-family: sans-serif; padding: 20px; }
+  label { display: block; margin-top: 10px; }
+  video, canvas { margin-top: 20px; border: 1px solid black; max-width: 100%; }
 </style>
 </head>
 <body>
+<h1>WinCorder TGR - WebM Recorder with Watermark</h1>
 
-<h2>Wincorder.tgr</h2>
+<label>
+  Resolution:
+  <select id="resolution">
+    <option value="640x480">640x480</option>
+    <option value="1280x720">1280x720</option>
+    <option value="1920x1080">1920x1080</option>
+  </select>
+</label>
 
-<div class="container">
-    <div class="watermark">VIDEO PREVIEW</div>
-    <video id="preview" autoplay muted playsinline></video>
-</div>
+<label>
+  FPS:
+  <input type="number" id="fps" value="30" min="1" max="60">
+</label>
 
-<div class="controls">
-    <label>
-        <input type="checkbox" id="micToggle" checked>
-        Microphone ON
-    </label>
+<label>
+  Audio:
+  <input type="checkbox" id="microphone"> Microphone
+  <input type="checkbox" id="systemAudio"> System Audio (Tab/Screen)
+</label>
 
-    <button id="startBtn">Start Recording</button>
-    <button id="stopBtn" disabled>Stop Recording</button>
-    <a id="downloadLink" style="display:none;">Download Video</a>
-</div>
+<label>
+  Preset:
+  <select id="preset">
+    <option value="">Custom</option>
+    <option value="ntsc">NTSC (1280x720, 30fps)</option>
+    <option value="pal">PAL (1280x720, 25fps)</option>
+    <option value="tv">TV (640x480, 15fps)</option>
+  </select>
+</label>
+
+<button id="start">Start Recording</button>
+<button id="stop" disabled>Stop Recording</button>
+<a id="download" style="display:none">Download</a>
+
+<video id="preview" autoplay muted style="display:none"></video>
+<canvas id="canvasPreview"></canvas>
 
 <script>
 let mediaRecorder;
 let recordedChunks = [];
-let canvasStream;
-let canvas, ctx, videoElement;
+let animationFrameId;
 
-const preview = document.getElementById("preview");
-const startBtn = document.getElementById("startBtn");
-const stopBtn = document.getElementById("stopBtn");
-const micToggle = document.getElementById("micToggle");
-const downloadLink = document.getElementById("downloadLink");
+const startButton = document.getElementById('start');
+const stopButton = document.getElementById('stop');
+const downloadLink = document.getElementById('download');
+const preview = document.getElementById('preview');
+const canvas = document.getElementById('canvasPreview');
+const ctx = canvas.getContext('2d');
 
-// Watermark opacity
-const watermarkOpacity = 0.75; // 0.0 = invisible, 1.0 = fully visible
+function applyPreset() {
+  const preset = document.getElementById('preset').value;
+  const resSelect = document.getElementById('resolution');
+  const fpsInput = document.getElementById('fps');
 
-micToggle.addEventListener("change", () => {
-    micToggle.parentElement.lastChild.textContent =
-        micToggle.checked ? " Microphone ON" : " Microphone OFF";
+  switch(preset) {
+    case 'ntsc':
+      resSelect.value = "1280x720";
+      fpsInput.value = 30;
+      break;
+    case 'pal':
+      resSelect.value = "1280x720";
+      fpsInput.value = 25;
+      break;
+    case 'tv':
+      resSelect.value = "640x480";
+      fpsInput.value = 15;
+      break;
+  }
+}
+
+document.getElementById('preset').addEventListener('change', applyPreset);
+
+function drawWatermark() {
+  const text = "www.wincorder.tgr";
+  ctx.font = "bold 40px Arial";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.fillStyle = "rgba(255,255,255,0.8)";
+  ctx.strokeStyle = "rgba(0,0,0,0.8)";
+  ctx.lineWidth = 2;
+  const x = canvas.width / 2;
+  const y = 10;
+  ctx.strokeText(text, x, y);
+  ctx.fillText(text, x, y);
+}
+
+function renderFrame(video) {
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  drawWatermark();
+  animationFrameId = requestAnimationFrame(() => renderFrame(video));
+}
+
+startButton.addEventListener('click', async () => {
+  startButton.disabled = true;
+  stopButton.disabled = false;
+
+  const resolution = document.getElementById('resolution').value.split('x');
+  const width = parseInt(resolution[0]);
+  const height = parseInt(resolution[1]);
+  const fps = parseInt(document.getElementById('fps').value);
+  const useMic = document.getElementById('microphone').checked;
+  const useSystemAudio = document.getElementById('systemAudio').checked;
+
+  canvas.width = width;
+  canvas.height = height;
+
+  // Capture display (screen/tab)
+  const displayStream = await navigator.mediaDevices.getDisplayMedia({
+    video: { width, height, frameRate: fps },
+    audio: useSystemAudio
+  });
+
+  if (useMic) {
+    const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    micStream.getAudioTracks().forEach(track => displayStream.addTrack(track));
+  }
+
+  preview.srcObject = displayStream;
+
+  // Render to canvas with watermark
+  renderFrame(preview);
+
+  // Capture canvas stream
+  const canvasStream = canvas.captureStream(fps);
+  const combinedStream = new MediaStream([
+    ...canvasStream.getVideoTracks(),
+    ...displayStream.getAudioTracks()
+  ]);
+
+  mediaRecorder = new MediaRecorder(combinedStream, { mimeType: 'video/webm;codecs=vp9,opus' });
+
+  mediaRecorder.ondataavailable = e => {
+    if (e.data.size > 0) recordedChunks.push(e.data);
+  };
+
+  mediaRecorder.onstop = () => {
+    cancelAnimationFrame(animationFrameId);
+    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+    recordedChunks = [];
+    const url = URL.createObjectURL(blob);
+    downloadLink.href = url;
+    downloadLink.download = 'recording.webm';
+    downloadLink.style.display = 'inline';
+    downloadLink.textContent = 'Download Recording';
+  };
+
+  mediaRecorder.start();
 });
 
-async function startScreenRecording() {
-    recordedChunks = [];
-
-    // Ask for microphone and screen audio
-    const useMic = micToggle.checked;
-
-    // Get screen video and optional audio
-    const screenStream = await navigator.mediaDevices.getDisplayMedia({
-        video: { frameRate: 24.97 },
-        audio: true // this captures screen/system audio if available
-    });
-
-    // Optional microphone audio
-    let audioStream = null;
-    if (useMic) {
-        audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    }
-
-    // Set up hidden video element to draw screen onto canvas
-    videoElement = document.createElement("video");
-    videoElement.srcObject = screenStream;
-    await videoElement.play();
-
-    // Set up canvas
-    canvas = document.createElement("canvas");
-    canvas.width = videoElement.videoWidth || 1280;
-    canvas.height = videoElement.videoHeight || 720;
-    ctx = canvas.getContext("2d");
-
-    function drawCanvas() {
-        ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-
-        // Draw watermark
-                ctx.font = "84px Arial";
-        ctx.fillStyle = `rgba(0,0,0,0.8)`;
-        ctx.textAlign = "center";
-        ctx.fillText("www.Wincorder.tgr", canvas.width / 2, 84);
-        ctx.font = "80px Arial";
-        ctx.fillStyle = `rgba(234,239,228,${watermarkOpacity})`;
-        ctx.textAlign = "center";
-        ctx.fillText("www.Wincorder.tgr", canvas.width / 2, 80);
-
-        requestAnimationFrame(drawCanvas);
-    }
-    drawCanvas();
-
-    // Capture canvas stream
-    canvasStream = canvas.captureStream(60);
-
-    // Combine with microphone if needed
-    let finalStream;
-    if (audioStream) {
-        finalStream = new MediaStream([
-            ...canvasStream.getVideoTracks(),
-            ...screenStream.getAudioTracks(), // screen audio
-            ...audioStream.getAudioTracks()   // mic audio
-        ]);
-    } else {
-        finalStream = new MediaStream([
-            ...canvasStream.getVideoTracks(),
-            ...screenStream.getAudioTracks() // just screen audio
-        ]);
-    }
-
-    preview.srcObject = finalStream;
-
-    mediaRecorder = new MediaRecorder(finalStream, { mimeType: "video/webm" });
-    mediaRecorder.ondataavailable = e => {
-        if (e.data.size > 0) recordedChunks.push(e.data);
-    };
-    mediaRecorder.onstop = () => {
-        const blob = new Blob(recordedChunks, { type: "video/webm" });
-        const url = URL.createObjectURL(blob);
-
-        downloadLink.href = url;
-        downloadLink.download = "Wincorder Video.webm";
-        downloadLink.textContent = "Download Video";
-        downloadLink.style.display = "inline";
-    };
-
-    mediaRecorder.start();
-    startBtn.disabled = true;
-    stopBtn.disabled = false;
-
-    // Stop if user stops sharing screen
-    screenStream.getVideoTracks()[0].addEventListener("ended", stopRecording);
-}
-
-function stopRecording() {
-    if (mediaRecorder && mediaRecorder.state !== "inactive") {
-        mediaRecorder.stop();
-    }
-    if (canvasStream) {
-        canvasStream.getTracks().forEach(track => track.stop());
-    }
-    if (videoElement) {
-        videoElement.pause();
-        videoElement.srcObject = null;
-    }
-    startBtn.disabled = false;
-    stopBtn.disabled = true;
-}
-
-startBtn.addEventListener("click", startScreenRecording);
-stopBtn.addEventListener("click", stopRecording);
+stopButton.addEventListener('click', () => {
+  mediaRecorder.stop();
+  startButton.disabled = false;
+  stopButton.disabled = true;
+});
 </script>
-
 </body>
 </html>
