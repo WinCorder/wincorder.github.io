@@ -119,17 +119,36 @@ startButton.addEventListener('click', async () => {
   canvas.height = height;
 
   // Capture display (screen/tab)
-  const displayStream = await navigator.mediaDevices.getDisplayMedia({
-    video: { width, height, frameRate: fps },
-    audio: useSystemAudio
-  });
-
-  if (useMic) {
-    const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    micStream.getAudioTracks().forEach(track => displayStream.addTrack(track));
+  let displayStream;
+  try {
+    displayStream = await navigator.mediaDevices.getDisplayMedia({
+      video: { width, height, frameRate: fps },
+      audio: useSystemAudio
+    });
+  } catch(err) {
+    alert("Error capturing display: " + err);
+    startButton.disabled = false;
+    stopButton.disabled = true;
+    return;
   }
 
+  // Capture microphone if needed
+  if (useMic) {
+    try {
+      const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      micStream.getAudioTracks().forEach(track => displayStream.addTrack(track));
+    } catch(err) {
+      alert("Error capturing microphone: " + err);
+    }
+  }
+
+  // Set video preview and ensure it plays
   preview.srcObject = displayStream;
+  try {
+    await preview.play();
+  } catch(err) {
+    console.warn("Preview play failed:", err);
+  }
 
   // Render to canvas with watermark
   renderFrame(preview);
@@ -141,6 +160,7 @@ startButton.addEventListener('click', async () => {
     ...displayStream.getAudioTracks()
   ]);
 
+  // Setup MediaRecorder
   mediaRecorder = new MediaRecorder(combinedStream, { mimeType: 'video/webm;codecs=vp9,opus' });
 
   mediaRecorder.ondataavailable = e => {
