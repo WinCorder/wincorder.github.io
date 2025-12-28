@@ -176,7 +176,7 @@ async function startScreenRecording() {
         const url = URL.createObjectURL(blob);
 
         downloadLink.href = url;
-        downloadLink.download = "Wincorder Video (1).webm";
+        downloadLink.download = "Wincorder Video.webm";
         downloadLink.textContent = "Download Video";
         downloadLink.style.display = "inline";
     };
