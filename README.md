@@ -98,7 +98,7 @@ const micToggle = document.getElementById("micToggle");
 const downloadLink = document.getElementById("downloadLink");
 
 // Watermark opacity
-const watermarkOpacity = 0.85; // 0.0 = invisible, 1.0 = fully visible
+const watermarkOpacity = 0.75; // 0.0 = invisible, 1.0 = fully visible
 
 micToggle.addEventListener("change", () => {
     micToggle.parentElement.lastChild.textContent =
@@ -138,10 +138,10 @@ async function startScreenRecording() {
         ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
 
         // Draw watermark
-        ctx.font = "120px Arial";
+        ctx.font = "60px Arial";
         ctx.fillStyle = `rgba(178,174,179,${watermarkOpacity})`;
         ctx.textAlign = "center";
-        ctx.fillText("Wincorder.tgr", canvas.width / 2, 120);
+        ctx.fillText("Wincorder.tgr", canvas.width / 2, 60);
 
         requestAnimationFrame(drawCanvas);
     }
