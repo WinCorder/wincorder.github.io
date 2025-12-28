@@ -138,10 +138,14 @@ async function startScreenRecording() {
         ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
 
         // Draw watermark
-        ctx.font = "60px Arial";
-        ctx.fillStyle = `rgba(178,174,179,${watermarkOpacity})`;
+                ctx.font = "84px Arial";
+        ctx.fillStyle = `rgba(0,0,0,0.8)`;
         ctx.textAlign = "center";
-        ctx.fillText("Wincorder.tgr", canvas.width / 2, 60);
+        ctx.fillText("www.Wincorder.tgr", canvas.width / 2, 84);
+        ctx.font = "80px Arial";
+        ctx.fillStyle = `rgba(234,239,228,${watermarkOpacity})`;
+        ctx.textAlign = "center";
+        ctx.fillText("www.Wincorder.tgr", canvas.width / 2, 80);
 
         requestAnimationFrame(drawCanvas);
     }
