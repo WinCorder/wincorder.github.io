@@ -6,10 +6,15 @@
 <style>
   body { font-family: sans-serif; padding: 20px; }
   label { display: block; margin-top: 10px; }
-  video, canvas { margin-top: 20px; border: 1px solid black; max-width: 100%; }
+  video, canvas {
+    margin-top: 20px;
+    border: 1px solid black;
+    max-width: 100%;
+  }
 </style>
 </head>
 <body>
+
 <h1>WinCorder TGR - WebM Recorder with Watermark</h1>
 
 <label>
@@ -33,6 +38,11 @@
 </label>
 
 <label>
+  <input type="checkbox" id="fixMacAudio">
+  Fix macOS audio (48kHz Opus – recommended on Mac)
+</label>
+
+<label>
   Preset:
   <select id="preset">
     <option value="">Custom</option>
@@ -44,7 +54,7 @@
 
 <button id="start">Start Recording</button>
 <button id="stop" disabled>Stop Recording</button>
-<a id="download" style="display:none">Download</a>
+<a id="download" style="display:none"></a>
 
 <video id="preview" autoplay muted style="display:none"></video>
 <canvas id="canvasPreview"></canvas>
@@ -63,26 +73,19 @@ const ctx = canvas.getContext('2d');
 
 function applyPreset() {
   const preset = document.getElementById('preset').value;
-  const resSelect = document.getElementById('resolution');
-  const fpsInput = document.getElementById('fps');
+  const res = document.getElementById('resolution');
+  const fps = document.getElementById('fps');
 
-  switch(preset) {
-    case 'ntsc':
-      resSelect.value = "1280x720";
-      fpsInput.value = 30;
-      break;
-    case 'pal':
-      resSelect.value = "1280x720";
-      fpsInput.value = 25;
-      break;
-    case 'tv':
-      resSelect.value = "640x480";
-      fpsInput.value = 15;
-      break;
-  }
+  if (preset === 'ntsc') { res.value = "1280x720"; fps.value = 30; }
+  if (preset === 'pal')  { res.value = "1280x720"; fps.value = 25; }
+  if (preset === 'tv')   { res.value = "640x480"; fps.value = 15; }
 }
-
 document.getElementById('preset').addEventListener('change', applyPreset);
+
+// Auto-enable macOS fix
+if (navigator.platform.includes("Mac")) {
+  document.getElementById('fixMacAudio').checked = true;
+}
 
 function drawWatermark() {
   const text = "www.wincorder.tgr";
@@ -92,10 +95,8 @@ function drawWatermark() {
   ctx.fillStyle = "rgba(255,255,255,0.8)";
   ctx.strokeStyle = "rgba(0,0,0,0.8)";
   ctx.lineWidth = 2;
-  const x = canvas.width / 2;
-  const y = 10;
-  ctx.strokeText(text, x, y);
-  ctx.fillText(text, x, y);
+  ctx.strokeText(text, canvas.width / 2, 10);
+  ctx.fillText(text, canvas.width / 2, 10);
 }
 
 function renderFrame(video) {
@@ -108,63 +109,89 @@ startButton.addEventListener('click', async () => {
   startButton.disabled = true;
   stopButton.disabled = false;
 
-  const resolution = document.getElementById('resolution').value.split('x');
-  const width = parseInt(resolution[0]);
-  const height = parseInt(resolution[1]);
-  const fps = parseInt(document.getElementById('fps').value);
+  const [width, height] = document.getElementById('resolution').value.split('x').map(Number);
+  const fps = Number(document.getElementById('fps').value);
   const useMic = document.getElementById('microphone').checked;
   const useSystemAudio = document.getElementById('systemAudio').checked;
+  const fixMacAudio = document.getElementById('fixMacAudio').checked;
 
   canvas.width = width;
   canvas.height = height;
 
-  // Capture display (screen/tab)
   let displayStream;
   try {
     displayStream = await navigator.mediaDevices.getDisplayMedia({
       video: { width, height, frameRate: fps },
       audio: useSystemAudio
     });
-  } catch(err) {
-    alert("Error capturing display: " + err);
+  } catch (err) {
+    alert("Display capture failed: " + err);
     startButton.disabled = false;
     stopButton.disabled = true;
     return;
   }
 
-  // Capture microphone if needed
-  if (useMic) {
-    try {
-      const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      micStream.getAudioTracks().forEach(track => displayStream.addTrack(track));
-    } catch(err) {
-      alert("Error capturing microphone: " + err);
+  preview.srcObject = displayStream;
+  await preview.play();
+  renderFrame(preview);
+
+  const canvasStream = canvas.captureStream(fps);
+  let finalAudioTracks = [];
+
+  if (useMic || useSystemAudio) {
+    if (fixMacAudio) {
+      const audioContext = new AudioContext({ sampleRate: 48000 });
+      const destination = audioContext.createMediaStreamDestination();
+
+      if (useSystemAudio) {
+        displayStream.getAudioTracks().forEach(track => {
+          const src = audioContext.createMediaStreamSource(new MediaStream([track]));
+          src.connect(destination);
+        });
+      }
+
+      if (useMic) {
+        const micStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            sampleRate: 48000,
+            channelCount: 2,
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false
+          }
+        });
+
+        micStream.getAudioTracks().forEach(track => {
+          const src = audioContext.createMediaStreamSource(new MediaStream([track]));
+          src.connect(destination);
+        });
+      }
+
+      finalAudioTracks = destination.stream.getAudioTracks();
+    } else {
+      if (useSystemAudio) {
+        displayStream.getAudioTracks().forEach(t => finalAudioTracks.push(t));
+      }
+      if (useMic) {
+        const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        micStream.getAudioTracks().forEach(t => finalAudioTracks.push(t));
+      }
     }
   }
 
-  // Set video preview and ensure it plays
-  preview.srcObject = displayStream;
-  try {
-    await preview.play();
-  } catch(err) {
-    console.warn("Preview play failed:", err);
-  }
-
-  // Render to canvas with watermark
-  renderFrame(preview);
-
-  // Capture canvas stream
-  const canvasStream = canvas.captureStream(fps);
   const combinedStream = new MediaStream([
     ...canvasStream.getVideoTracks(),
-    ...displayStream.getAudioTracks()
+    ...finalAudioTracks
   ]);
 
-  // Setup MediaRecorder
-  mediaRecorder = new MediaRecorder(combinedStream, { mimeType: 'video/webm;codecs=vp9,opus' });
+  mediaRecorder = new MediaRecorder(combinedStream, {
+    mimeType: 'video/webm;codecs=vp9,opus',
+    audioBitsPerSecond: 192000,
+    videoBitsPerSecond: 6000000
+  });
 
   mediaRecorder.ondataavailable = e => {
-    if (e.data.size > 0) recordedChunks.push(e.data);
+    if (e.data.size) recordedChunks.push(e.data);
   };
 
   mediaRecorder.onstop = () => {
@@ -174,8 +201,8 @@ startButton.addEventListener('click', async () => {
     const url = URL.createObjectURL(blob);
     downloadLink.href = url;
     downloadLink.download = 'recording.webm';
-    downloadLink.style.display = 'inline';
     downloadLink.textContent = 'Download Recording';
+    downloadLink.style.display = 'inline';
   };
 
   mediaRecorder.start();
