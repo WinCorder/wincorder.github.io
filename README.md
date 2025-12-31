@@ -15,20 +15,23 @@
 </head>
 <body>
 
-<h1>WinCorder TGR - WebM Recorder with Watermark</h1>
+<h1>WinCorder</h1>
 
 <label>
   Resolution:
   <select id="resolution">
     <option value="640x480">640x480</option>
+    <option value="854x480">854x480</option>
+    <option value="960x720">960x720</option>
     <option value="1280x720">1280x720</option>
+    <option value="1440x1080">1440x1080</option>
     <option value="1920x1080">1920x1080</option>
   </select>
 </label>
 
 <label>
   FPS:
-  <input type="number" id="fps" value="30" min="1" max="60">
+  <input type="number" id="fps" value="30" min="1" max="240">
 </label>
 
 <label>
@@ -88,7 +91,7 @@ if (navigator.platform.includes("Mac")) {
 }
 
 function drawWatermark() {
-  const text = "www.wincorder.tgr";
+  const text = "wincorder.github.io";
   ctx.font = "bold 40px Arial";
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
