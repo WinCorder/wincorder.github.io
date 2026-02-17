@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>WinCorder TGR</title>
+<title>WinCorder</title>
 <style>
   body { font-family: sans-serif; padding: 20px; }
   label { display: block; margin-top: 10px; }
@@ -189,7 +189,7 @@ startButton.addEventListener('click', async () => {
 
   mediaRecorder = new MediaRecorder(combinedStream, {
     mimeType: 'video/webm;codecs=vp9,opus',
-    audioBitsPerSecond: 192000,
+    audioBitsPerSecond: 1920000,
     videoBitsPerSecond: 6000000
   });
 
@@ -203,7 +203,7 @@ startButton.addEventListener('click', async () => {
     recordedChunks = [];
     const url = URL.createObjectURL(blob);
     downloadLink.href = url;
-    downloadLink.download = 'recording.webm';
+    downloadLink.download = 'recording.mp4';
     downloadLink.textContent = 'Download Recording';
     downloadLink.style.display = 'inline';
   };
