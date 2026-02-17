@@ -65,7 +65,7 @@
 <script>
 let mediaRecorder;
 let recordedChunks = [];
-let animationFrameId;
+let stopDrawing = false;
 
 const startButton = document.getElementById('start');
 const stopButton = document.getElementById('stop');
@@ -85,7 +85,6 @@ function applyPreset() {
 }
 document.getElementById('preset').addEventListener('change', applyPreset);
 
-// Auto-enable macOS fix
 if (navigator.platform.includes("Mac")) {
   document.getElementById('fixMacAudio').checked = true;
 }
@@ -102,15 +101,26 @@ function drawWatermark() {
   ctx.fillText(text, canvas.width / 2, 10);
 }
 
-function renderFrame(video) {
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-  drawWatermark();
-  animationFrameId = requestAnimationFrame(() => renderFrame(video));
+function startVideoFrameLoop(video) {
+  stopDrawing = false;
+
+  function draw(now, metadata) {
+    if (stopDrawing) return;
+
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    drawWatermark();
+
+    video.requestVideoFrameCallback(draw);
+  }
+
+  video.requestVideoFrameCallback(draw);
 }
 
 startButton.addEventListener('click', async () => {
   startButton.disabled = true;
   stopButton.disabled = false;
+  downloadLink.style.display = 'none';
+  recordedChunks = [];
 
   const [width, height] = document.getElementById('resolution').value.split('x').map(Number);
   const fps = Number(document.getElementById('fps').value);
@@ -136,12 +146,13 @@ startButton.addEventListener('click', async () => {
 
   preview.srcObject = displayStream;
   await preview.play();
-  renderFrame(preview);
+  startVideoFrameLoop(preview);
 
   const canvasStream = canvas.captureStream(fps);
   let finalAudioTracks = [];
 
   if (useMic || useSystemAudio) {
+
     if (fixMacAudio) {
       const audioContext = new AudioContext({ sampleRate: 48000 });
       const destination = audioContext.createMediaStreamDestination();
@@ -189,8 +200,8 @@ startButton.addEventListener('click', async () => {
 
   mediaRecorder = new MediaRecorder(combinedStream, {
     mimeType: 'video/webm;codecs=vp9,opus',
-    audioBitsPerSecond: 1920000,
-    videoBitsPerSecond: 6000000
+    videoBitsPerSecond: 8000000,
+    audioBitsPerSecond: 192000
   });
 
   mediaRecorder.ondataavailable = e => {
@@ -198,14 +209,17 @@ startButton.addEventListener('click', async () => {
   };
 
   mediaRecorder.onstop = () => {
-    cancelAnimationFrame(animationFrameId);
+    stopDrawing = true;
+
     const blob = new Blob(recordedChunks, { type: 'video/webm' });
-    recordedChunks = [];
     const url = URL.createObjectURL(blob);
+
     downloadLink.href = url;
-    downloadLink.download = 'recording.mp4';
+    downloadLink.download = 'recording.webm';
     downloadLink.textContent = 'Download Recording';
     downloadLink.style.display = 'inline';
+
+    displayStream.getTracks().forEach(track => track.stop());
   };
 
   mediaRecorder.start();
@@ -217,5 +231,6 @@ stopButton.addEventListener('click', () => {
   stopButton.disabled = true;
 });
 </script>
+
 </body>
 </html>
