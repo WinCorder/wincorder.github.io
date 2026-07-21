@@ -91,7 +91,9 @@ console.log("FFmpeg globals:",
 <a id="downloadMp4" style="display:none"></a>
 
 <p id="status"></p>
-
+<progress id="progressBar" value="0" max="100" style="display:none; width:300px;"></progress>
+<span id="progressText"></span>
+  
 <video id="preview" autoplay muted style="display:none"></video>
 <canvas id="canvasPreview"></canvas>
 
@@ -119,6 +121,11 @@ const downloadWebm = document.getElementById('downloadWebm');
 const downloadMp4 = document.getElementById('downloadMp4');
 
 const status = document.getElementById('status');
+const progressBar = document.getElementById('progressBar');
+const progressText = document.getElementById('progressText');
+
+let mp4Ready = false;
+let converting = false;
 
 const preview = document.getElementById('preview');
 const canvas = document.getElementById('canvasPreview');
@@ -238,10 +245,11 @@ startButton.addEventListener('click', async () => {
 
   status.textContent = "";
 
-  recordedChunks = [];
-  recordedBlob = null;
-
-
+recordedChunks = [];
+recordedBlob = null;
+mp4Ready = false;
+converting = false;
+  
   const [width, height] =
     document.getElementById('resolution')
     .value.split('x')
@@ -510,7 +518,18 @@ startButton.addEventListener('click', async () => {
 
 
 downloadMp4.addEventListener('click', async () => {
+if (converting || mp4Ready) {
+  return;
+}
 
+converting = true;
+
+downloadMp4.style.pointerEvents = "none";
+downloadMp4.style.opacity = "0.5";
+
+progressBar.style.display = "inline";
+progressBar.value = 0;
+progressText.textContent = "0%";
 
   if (!recordedBlob)
     return;
@@ -535,11 +554,19 @@ downloadMp4.addEventListener('click', async () => {
 
 
 
-    ffmpeg.FS(
-      "writeFile",
-      "recording.webm",
-      await fetchFile(recordedBlob)
-    );
+try {
+  ffmpeg.FS("unlink", "recording.webm");
+} catch(e) {}
+
+try {
+  ffmpeg.FS("unlink", "recording.mp4");
+} catch(e) {}
+
+ffmpeg.FS(
+  "writeFile",
+  "recording.webm",
+  await fetchFile(recordedBlob)
+);
 
 
 
