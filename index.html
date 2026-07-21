@@ -578,8 +578,14 @@ ffmpeg.FS(
       "-c:v",
       "libx264",
 
+      "-pix_fmt",
+      "yuv420p",
+
       "-crf",
       "18",
+
+      "-movflags",
+      "+faststart",
 
       "-preset",
       "slow",
@@ -634,7 +640,15 @@ ffmpeg.FS(
 
 
 
-    downloadMp4.replaceWith(link);
+    downloadMp4.href = mp4URL;
+    downloadMp4.download = "recording.mp4";
+    downloadMp4.textContent = "Download MP4";
+
+    downloadMp4.style.pointerEvents = "auto";
+    downloadMp4.style.opacity = "1";
+
+    mp4Ready = true;
+    converting = false;
 
 
 
