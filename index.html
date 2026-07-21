@@ -7,6 +7,13 @@
 
 <!-- FFmpeg WebAssembly -->
 <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.min.js"></script>
+  <script>
+console.log("FFmpeg globals:",
+  Object.keys(window).filter(
+    x => x.toLowerCase().includes("ffmpeg")
+  )
+);
+</script>
   
 <style>
   body { font-family: sans-serif; padding: 20px; }
