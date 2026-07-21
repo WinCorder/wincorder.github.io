@@ -96,6 +96,17 @@ import { FFmpeg } from "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist
 
 const ffmpeg = new FFmpeg();
 
+ffmpeg.createWorker = async () => {
+  const workerURL = await toBlobURL(
+    "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/worker.js",
+    "text/javascript"
+  );
+
+  return new Worker(workerURL, {
+    type: "module"
+  });
+};
+
 let ffmpegLoaded = false;
 let mediaRecorder;
 let recordedChunks = [];
