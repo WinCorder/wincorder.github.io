@@ -87,7 +87,7 @@
 
 <script>
 
-const { FFmpeg } = FFmpegWASM;
+const { FFmpeg } = FFmpegJS;
 
 const ffmpeg = new FFmpeg();
 
@@ -110,7 +110,22 @@ const preview = document.getElementById('preview');
 const canvas = document.getElementById('canvasPreview');
 const ctx = canvas.getContext('2d');
 
+function toBlobURL(url, mimeType) {
 
+  return fetch(url)
+    .then(response => response.blob())
+    .then(blob => {
+
+      return URL.createObjectURL(
+        new Blob([blob], {
+          type: mimeType
+        })
+      );
+
+    });
+
+}
+  
 async function loadFFmpeg() {
 
   if (ffmpegLoaded)
@@ -118,12 +133,17 @@ async function loadFFmpeg() {
 
   status.textContent = "Loading MP4 converter...";
 
-  await ffmpeg.load({
-    coreURL:
-      "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js",
-    wasmURL:
-      "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm"
-  });
+await ffmpeg.load({
+  coreURL: await toBlobURL(
+    "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js",
+    "text/javascript"
+  ),
+
+  wasmURL: await toBlobURL(
+    "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm",
+    "application/wasm"
+  )
+});
 
   ffmpegLoaded = true;
 
