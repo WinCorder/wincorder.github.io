@@ -550,14 +550,15 @@ downloadMp4.addEventListener('click', async () => {
 
 
 
-    await ffmpeg.writeFile(
+    ffmpeg.FS(
+      "writeFile"
       "recording.webm",
-      data
+      await fetchFile(recordedBlob)
     );
 
 
 
-    await ffmpeg.exec([
+    await ffmpeg.run(
 
       "-i",
       "recording.webm",
@@ -579,14 +580,14 @@ downloadMp4.addEventListener('click', async () => {
 
       "recording.mp4"
 
-    ]);
+    );
 
 
 
-    const mp4Data =
-      await ffmpeg.readFile(
-        "recording.mp4"
-      );
+    const mp4Data = ffmpeg.FS(
+      "readFile",
+      "recording.mp4"
+    );
 
 
 
