@@ -55,7 +55,7 @@ console.log("FFmpeg globals:",
 
 <label>
   FPS:
-  <input type="number" id="fps" value="30" min="1" max="240">
+  <input type="number" id="fps" value="29.97" min="1" max="240">
 </label>
 
 <label>
@@ -141,13 +141,7 @@ async function loadFFmpeg() {
 
   status.textContent = "Loading MP4 converter...";
 
-  await ffmpeg.load({
-    coreURL:
-      "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js",
-
-    wasmURL:
-      "https://github.com/WinCorder/wincorder.github.io/releases/download/wasm/ffmpeg-core.wasm"
-  });
+  await ffmpeg.load();
 
   ffmpegLoaded = true;
 
