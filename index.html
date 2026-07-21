@@ -129,19 +129,30 @@ async function loadFFmpeg() {
 
   status.textContent = "Loading MP4 converter...";
 
-  const baseURL =
-    "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
+  const ffmpegURL =
+    "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/814.ffmpeg.js";
+
+  const coreURL =
+    "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.js";
+
+  const wasmURL =
+    "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.wasm";
 
 
   await ffmpeg.load({
 
+    classWorkerURL: await toBlobURL(
+      ffmpegURL,
+      "text/javascript"
+    ),
+
     coreURL: await toBlobURL(
-      `${baseURL}/ffmpeg-core.js`,
+      coreURL,
       "text/javascript"
     ),
 
     wasmURL: await toBlobURL(
-      `${baseURL}/ffmpeg-core.wasm`,
+      wasmURL,
       "application/wasm"
     )
 
