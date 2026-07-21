@@ -145,21 +145,16 @@ async function loadFFmpeg() {
 
   status.textContent = "Loading MP4 converter...";
 
-  const baseURL =
-    "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd";
-
-
   await ffmpeg.load({
 
-    coreURL: await toBlobURL(
-      `${baseURL}/ffmpeg-core.js`,
-      "text/javascript"
-    ),
+    classWorkerURL:
+      "./ffmpeg/worker.js",
 
-    wasmURL: await toBlobURL(
-      `${baseURL}/ffmpeg-core.wasm`,
-      "application/wasm"
-    )
+    coreURL:
+      "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js",
+
+    wasmURL:
+      "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm"
 
   });
 
