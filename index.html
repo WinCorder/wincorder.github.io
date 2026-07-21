@@ -102,17 +102,6 @@ const ffmpeg = createFFmpeg({
   log: true,
   corePath: "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js"
 });
-  
-ffmpeg.createWorker = async () => {
-  const workerURL = await toBlobURL(
-    "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/worker.js",
-    "text/javascript"
-  );
-
-  return new Worker(workerURL, {
-    type: "module"
-  });
-};
 
 let ffmpegLoaded = false;
 let mediaRecorder;
@@ -551,7 +540,7 @@ downloadMp4.addEventListener('click', async () => {
 
 
     ffmpeg.FS(
-      "writeFile"
+      "writeFile",
       "recording.webm",
       await fetchFile(recordedBlob)
     );
