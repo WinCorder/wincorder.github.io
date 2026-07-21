@@ -170,6 +170,9 @@ async function loadFFmpeg() {
     "MP4 converter ready.";
 }
   
+status.textContent = "Converting to MP4...";
+progressText.textContent = "0%";
+  
 function applyPreset() {
 
   const preset = document.getElementById('preset').value;
@@ -547,7 +550,7 @@ downloadMp4.style.opacity = "0.5";
 
 progressBar.style.display = "inline";
 progressBar.value = 0;
-progressText.textContent = "0%";
+progressText.textContent = "Preparing...";
 
   if (!recordedBlob)
     return;
