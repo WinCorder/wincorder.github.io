@@ -675,16 +675,19 @@ ffmpeg.FS(
 
 
 
-  } catch (err) {
-
+} catch (err) {
 
     console.error(err);
 
     status.textContent =
       "MP4 conversion failed: " + err;
 
+    converting = false;
 
-  }
+    downloadMp4.style.pointerEvents = "auto";
+    downloadMp4.style.opacity = "1";
+
+}
 
 
 });
