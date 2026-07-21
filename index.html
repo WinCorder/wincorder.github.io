@@ -6,7 +6,11 @@
 <title>WinCorder</title>
 
 <!-- FFmpeg WebAssembly -->
-<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.min.js"></script>
+<script type="module">
+import { FFmpeg } from "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js";
+
+window.FFmpegClass = FFmpeg;
+</script>
   <script>
 console.log("FFmpeg globals:",
   Object.keys(window).filter(
@@ -15,7 +19,7 @@ console.log("FFmpeg globals:",
 );
 </script>
   
-<style>
+<script type="module">
   body { font-family: sans-serif; padding: 20px; }
   label { display: block; margin-top: 10px; }
   video, canvas {
@@ -92,11 +96,9 @@ console.log("FFmpeg globals:",
 <canvas id="canvasPreview"></canvas>
 
 
-<script>
+<script type="module">
 
-const { FFmpeg } = FFmpegWASM;
-
-const ffmpeg = new FFmpeg();
+const ffmpeg = new FFmpegClass();
 
 let ffmpegLoaded = false;
 let mediaRecorder;
