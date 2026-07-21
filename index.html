@@ -1,9 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
-<link rel="icon" href="wincorder.ico" type="image/x-icon>
+<link rel="icon" href="wincorder.ico" type="image/x-icon">
 <head>
 <meta charset="UTF-8">
 <title>WinCorder</title>
+
+<!-- FFmpeg WebAssembly -->
+<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.min.js"></script>
+
 <style>
   body { font-family: sans-serif; padding: 20px; }
   label { display: block; margin-top: 10px; }
@@ -12,8 +16,18 @@
     border: 1px solid black;
     max-width: 100%;
   }
+
+  button {
+    margin-top: 10px;
+  }
+
+  #status {
+    margin-top: 15px;
+    font-weight: bold;
+  }
 </style>
 </head>
+
 <body>
 
 <h1>WinCorder</h1>
@@ -58,179 +72,558 @@
 
 <button id="start">Start Recording</button>
 <button id="stop" disabled>Stop Recording</button>
-<a id="download" style="display:none"></a>
+
+<br>
+
+<a id="downloadWebm" style="display:none"></a>
+<br>
+<a id="downloadMp4" style="display:none"></a>
+
+<p id="status"></p>
 
 <video id="preview" autoplay muted style="display:none"></video>
 <canvas id="canvasPreview"></canvas>
 
+
 <script>
+
+const { FFmpeg } = FFmpegWASM;
+
+const ffmpeg = new FFmpeg();
+
+let ffmpegLoaded = false;
 let mediaRecorder;
 let recordedChunks = [];
+let recordedBlob = null;
 let stopDrawing = false;
+
 
 const startButton = document.getElementById('start');
 const stopButton = document.getElementById('stop');
-const downloadLink = document.getElementById('download');
+
+const downloadWebm = document.getElementById('downloadWebm');
+const downloadMp4 = document.getElementById('downloadMp4');
+
+const status = document.getElementById('status');
+
 const preview = document.getElementById('preview');
 const canvas = document.getElementById('canvasPreview');
 const ctx = canvas.getContext('2d');
 
+
+async function loadFFmpeg() {
+
+  if (ffmpegLoaded)
+    return;
+
+  status.textContent = "Loading MP4 converter...";
+
+  await ffmpeg.load({
+    coreURL:
+      "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js",
+    wasmURL:
+      "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm"
+  });
+
+  ffmpegLoaded = true;
+
+  status.textContent = "MP4 converter ready.";
+
+}
+
+
 function applyPreset() {
+
   const preset = document.getElementById('preset').value;
   const res = document.getElementById('resolution');
   const fps = document.getElementById('fps');
 
-  if (preset === 'ntsc') { res.value = "1280x720"; fps.value = 30; }
-  if (preset === 'pal')  { res.value = "1280x720"; fps.value = 25; }
-  if (preset === 'tv')   { res.value = "640x480"; fps.value = 15; }
+  if (preset === 'ntsc') {
+    res.value = "1280x720";
+    fps.value = 30;
+  }
+
+  if (preset === 'pal') {
+    res.value = "1280x720";
+    fps.value = 25;
+  }
+
+  if (preset === 'tv') {
+    res.value = "640x480";
+    fps.value = 15;
+  }
+
 }
-document.getElementById('preset').addEventListener('change', applyPreset);
+
+
+document.getElementById('preset')
+.addEventListener('change', applyPreset);
+
 
 if (navigator.platform.includes("Mac")) {
   document.getElementById('fixMacAudio').checked = true;
 }
 
+
 function drawWatermark() {
+
   const text = "wincorder.github.io";
+
   ctx.font = "bold 40px Arial";
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
+
   ctx.fillStyle = "rgba(255,255,255,0.8)";
   ctx.strokeStyle = "rgba(0,0,0,0.8)";
   ctx.lineWidth = 2;
+
   ctx.strokeText(text, canvas.width / 2, 10);
   ctx.fillText(text, canvas.width / 2, 10);
+
 }
 
+
 function startVideoFrameLoop(video) {
+
   stopDrawing = false;
 
-  function draw(now, metadata) {
-    if (stopDrawing) return;
+  function draw() {
 
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    if (stopDrawing)
+      return;
+
+    ctx.drawImage(
+      video,
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
+
     drawWatermark();
 
     video.requestVideoFrameCallback(draw);
+
   }
 
   video.requestVideoFrameCallback(draw);
-}
 
+}
 startButton.addEventListener('click', async () => {
+
   startButton.disabled = true;
   stopButton.disabled = false;
-  downloadLink.style.display = 'none';
-  recordedChunks = [];
 
-  const [width, height] = document.getElementById('resolution').value.split('x').map(Number);
-  const fps = Number(document.getElementById('fps').value);
-  const useMic = document.getElementById('microphone').checked;
-  const useSystemAudio = document.getElementById('systemAudio').checked;
-  const fixMacAudio = document.getElementById('fixMacAudio').checked;
+  downloadWebm.style.display = 'none';
+  downloadMp4.style.display = 'none';
+
+  status.textContent = "";
+
+  recordedChunks = [];
+  recordedBlob = null;
+
+
+  const [width, height] =
+    document.getElementById('resolution')
+    .value.split('x')
+    .map(Number);
+
+  const fps =
+    Number(document.getElementById('fps').value);
+
+  const useMic =
+    document.getElementById('microphone').checked;
+
+  const useSystemAudio =
+    document.getElementById('systemAudio').checked;
+
+  const fixMacAudio =
+    document.getElementById('fixMacAudio').checked;
+
 
   canvas.width = width;
   canvas.height = height;
 
+
   let displayStream;
+
   try {
+
     displayStream = await navigator.mediaDevices.getDisplayMedia({
-      video: { width, height, frameRate: fps },
+
+      video: {
+        width,
+        height,
+        frameRate: fps
+      },
+
       audio: useSystemAudio
+
     });
+
   } catch (err) {
+
     alert("Display capture failed: " + err);
+
     startButton.disabled = false;
     stopButton.disabled = true;
+
     return;
+
   }
 
+
   preview.srcObject = displayStream;
+
   await preview.play();
+
   startVideoFrameLoop(preview);
 
+
+
   const canvasStream = canvas.captureStream(fps);
+
   let finalAudioTracks = [];
+
 
   if (useMic || useSystemAudio) {
 
+
     if (fixMacAudio) {
-      const audioContext = new AudioContext({ sampleRate: 48000 });
-      const destination = audioContext.createMediaStreamDestination();
+
+
+      const audioContext =
+        new AudioContext({
+          sampleRate: 48000
+        });
+
+
+      const destination =
+        audioContext.createMediaStreamDestination();
+
+
 
       if (useSystemAudio) {
-        displayStream.getAudioTracks().forEach(track => {
-          const src = audioContext.createMediaStreamSource(new MediaStream([track]));
+
+        displayStream
+        .getAudioTracks()
+        .forEach(track => {
+
+          const src =
+            audioContext.createMediaStreamSource(
+              new MediaStream([track])
+            );
+
           src.connect(destination);
+
         });
+
       }
+
+
 
       if (useMic) {
-        const micStream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            sampleRate: 48000,
-            channelCount: 2,
-            echoCancellation: false,
-            noiseSuppression: false,
-            autoGainControl: false
-          }
+
+
+        const micStream =
+          await navigator.mediaDevices.getUserMedia({
+
+            audio: {
+
+              sampleRate: 48000,
+              channelCount: 2,
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false
+
+            }
+
+          });
+
+
+
+        micStream
+        .getAudioTracks()
+        .forEach(track => {
+
+          const src =
+            audioContext.createMediaStreamSource(
+              new MediaStream([track])
+            );
+
+          src.connect(destination);
+
         });
 
-        micStream.getAudioTracks().forEach(track => {
-          const src = audioContext.createMediaStreamSource(new MediaStream([track]));
-          src.connect(destination);
-        });
       }
 
-      finalAudioTracks = destination.stream.getAudioTracks();
+
+      finalAudioTracks =
+        destination.stream.getAudioTracks();
+
+
     } else {
+
+
       if (useSystemAudio) {
-        displayStream.getAudioTracks().forEach(t => finalAudioTracks.push(t));
+
+        displayStream
+        .getAudioTracks()
+        .forEach(t => finalAudioTracks.push(t));
+
       }
+
+
       if (useMic) {
-        const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        micStream.getAudioTracks().forEach(t => finalAudioTracks.push(t));
+
+        const micStream =
+          await navigator.mediaDevices.getUserMedia({
+            audio: true
+          });
+
+
+        micStream
+        .getAudioTracks()
+        .forEach(t => finalAudioTracks.push(t));
+
       }
+
     }
+
   }
 
-  const combinedStream = new MediaStream([
-    ...canvasStream.getVideoTracks(),
-    ...finalAudioTracks
-  ]);
 
-  mediaRecorder = new MediaRecorder(combinedStream, {
-    mimeType: 'video/webm;codecs=vp9,opus',
-    videoBitsPerSecond: 8000000,
-    audioBitsPerSecond: 192000
-  });
+
+  const combinedStream =
+    new MediaStream([
+
+      ...canvasStream.getVideoTracks(),
+      ...finalAudioTracks
+
+    ]);
+
+
+
+  mediaRecorder =
+    new MediaRecorder(
+      combinedStream,
+      {
+
+        mimeType:
+          'video/webm;codecs=vp9,opus',
+
+        videoBitsPerSecond: 8000000,
+
+        audioBitsPerSecond: 192000
+
+      }
+    );
+
+
 
   mediaRecorder.ondataavailable = e => {
-    if (e.data.size) recordedChunks.push(e.data);
+
+    if (e.data.size)
+      recordedChunks.push(e.data);
+
   };
+
+
 
   mediaRecorder.onstop = () => {
+
+
     stopDrawing = true;
 
-    const blob = new Blob(recordedChunks, { type: 'video/webm' });
-    const url = URL.createObjectURL(blob);
 
-    downloadLink.href = url;
-    downloadLink.download = 'recording.webm';
-    downloadLink.textContent = 'Download Recording';
-    downloadLink.style.display = 'inline';
+    recordedBlob =
+      new Blob(
+        recordedChunks,
+        {
+          type: 'video/webm'
+        }
+      );
 
-    displayStream.getTracks().forEach(track => track.stop());
+
+
+    const webmURL =
+      URL.createObjectURL(recordedBlob);
+
+
+
+    downloadWebm.href = webmURL;
+
+    downloadWebm.download =
+      "recording.webm";
+
+    downloadWebm.textContent =
+      "Download WebM";
+
+    downloadWebm.style.display =
+      "inline";
+
+
+
+    downloadMp4.textContent =
+      "Convert to MP4";
+
+    downloadMp4.style.display =
+      "inline";
+
+
+
+    displayStream
+    .getTracks()
+    .forEach(track => track.stop());
+
+
   };
 
+
+
   mediaRecorder.start();
+
+
 });
 
-stopButton.addEventListener('click', () => {
-  mediaRecorder.stop();
-  startButton.disabled = false;
-  stopButton.disabled = true;
+
+
+
+
+downloadMp4.addEventListener('click', async () => {
+
+
+  if (!recordedBlob)
+    return;
+
+
+  try {
+
+
+    await loadFFmpeg();
+
+
+
+    status.textContent =
+      "Converting to MP4...";
+
+
+
+    const data =
+      new Uint8Array(
+        await recordedBlob.arrayBuffer()
+      );
+
+
+
+    await ffmpeg.writeFile(
+      "recording.webm",
+      data
+    );
+
+
+
+    await ffmpeg.exec([
+
+      "-i",
+      "recording.webm",
+
+      "-c:v",
+      "libx264",
+
+      "-crf",
+      "18",
+
+      "-preset",
+      "slow",
+
+      "-c:a",
+      "aac",
+
+      "-b:a",
+      "192k",
+
+      "recording.mp4"
+
+    ]);
+
+
+
+    const mp4Data =
+      await ffmpeg.readFile(
+        "recording.mp4"
+      );
+
+
+
+    const mp4Blob =
+      new Blob(
+        [mp4Data.buffer],
+        {
+          type: "video/mp4"
+        }
+      );
+
+
+
+    const mp4URL =
+      URL.createObjectURL(mp4Blob);
+
+
+
+    const link =
+      document.createElement("a");
+
+    link.href = mp4URL;
+
+    link.download =
+      "recording.mp4";
+
+    link.textContent =
+      "Download MP4";
+
+    link.style.display =
+      "inline";
+
+
+
+    downloadMp4.replaceWith(link);
+
+
+
+    status.textContent =
+      "MP4 conversion complete.";
+
+
+
+  } catch (err) {
+
+
+    console.error(err);
+
+    status.textContent =
+      "MP4 conversion failed: " + err;
+
+
+  }
+
+
 });
+
+
+
+
+
+stopButton.addEventListener('click', () => {
+
+  mediaRecorder.stop();
+
+  startButton.disabled = false;
+
+  stopButton.disabled = true;
+
+});
+
 </script>
 
 </body>
